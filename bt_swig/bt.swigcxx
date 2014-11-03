@@ -1,0 +1,65 @@
+// #go CXXFLAGS: -Ibullet/
+// #go LDFLAGS: -l:libm.a
+// #go LDFLAGS: -Lbullet/BulletCollision -lBulletCollision
+// #go LDFLAGS: -Lbullet/BulletDynamics -lBulletDynamics
+
+//#define ATTRIBUTE_ALIGNED16(v) v
+//#define ATTRIBUTE_ALIGNED128(v) v
+//#define SIMD_FORCE_INLINE
+
+//btDiscreteCollisionDetectorInterface::getClosestPoints
+//%ignore btDiscreteCollisionDetectorInterface::getClosestPoints;
+//%ignore btStorageResult;
+//%ignore btCollisionObjectWrapper;
+//%ignore btCollisionWorld::rayTest(const btVector3&, const btVector3&, RayResultCallback&) const;
+//%ignore btCollisionWorld::convexSweepTest (const btConvexShape* castShape, const btTransform& from, const btTransform& to, ConvexResultCallback& resultCallback,  btScalar allowedCcdPenetration = btScalar(0.)) const;
+//%ignore btCollisionWorld::contactTest(btCollisionObject* colObj, ContactResultCallback& resultCallback);
+//%ignore btCollisionWorld::contactPairTest(btCollisionObject* colObjA, btCollisionObject* colObjB, ContactResultCallback& resultCallback);
+
+%ignore getLockedVertexIndexBase;
+%ignore getLockedReadOnlyVertexIndexBase;
+%ignore get_limit_motor_info2;
+
+%ignore btRaycastVehicle;
+
+%{
+#include <BulletCollision/CollisionDispatch/btCollisionWorld.h>
+typedef btCollisionWorld::RayResultCallback RayResultCallback;
+typedef btCollisionWorld::ConvexResultCallback ConvexResultCallback;
+typedef btCollisionWorld::ContactResultCallback ContactResultCallback;
+
+#include <BulletCollision/BroadphaseCollision/btDbvt.h>
+typedef btDbvt::sStkNN sStkNN;
+typedef btDbvt::sStkNPS sStkNPS;
+typedef btDbvt::ICollide ICollide;
+typedef btDbvt::IWriter IWriter;
+typedef btDbvt::IClone IClone;
+
+#include <BulletCollision/BroadphaseCollision/btMultiSapBroadphase.h>
+typedef btMultiSapBroadphase::btMultiSapProxy btMultiSapProxy;
+
+#include <BulletDynamics/Dynamics/btRigidBody.h>
+typedef btRigidBody::btRigidBodyConstructionInfo btRigidBodyConstructionInfo;
+
+#include <BulletDynamics/ConstraintSolver/btTypedConstraint.h>
+typedef btTypedConstraint::btConstraintInfo1 btConstraintInfo1;
+typedef btTypedConstraint::btConstraintInfo2 btConstraintInfo2;
+
+
+#include <BulletDynamics/Vehicle/btVehicleRaycaster.h>
+typedef btVehicleRaycaster::btVehicleRaycasterResult btVehicleRaycasterResult;
+
+#include <BulletDynamics/Vehicle/btWheelInfo.h>
+typedef btWheelInfo::RaycastInfo RaycastInfo;
+
+#include <btBulletDynamicsCommon.h>
+%}
+
+%include "iface/btBulletCollisionCommon.h"
+
+//%ignore getLockedVertexIndexBase;
+//%ignore getLockedReadOnlyVertexIndexBase;
+
+//%ignore btStorageResult;
+//%ignore btCollisionObjectWrapper;
+

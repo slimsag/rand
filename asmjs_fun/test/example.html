@@ -1,0 +1,31 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>Hello</title>
+	</head>
+	<body>
+		<script>
+function DiagModule(stdlib) {
+    "use asm";
+
+    var sqrt = stdlib.Math.sqrt;
+
+    function square(x) {
+        x = +x;
+        return +(x*x);
+    }
+
+    function diag(x, y) {
+        x = +x;
+        y = +y;
+        return +sqrt(+square(x) + +square(y));
+    }
+
+    return { diag: diag };
+}
+
+var diag = DiagModule(window);
+alert(diag.diag(3, 4))
+		</script>
+	</body>
+</html>

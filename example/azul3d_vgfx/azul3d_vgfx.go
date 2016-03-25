@@ -7,81 +7,38 @@ package main
 
 import (
 	"image"
-	"io/ioutil"
+	_ "image/png"
 	"log"
-	"os"
 
-	"azul3d.org/chippy.v1"
-	"azul3d.org/gfx.v1"
-	"azul3d.org/gfx/window.v2"
-	"azul3d.org/keyboard.v1"
-	"azul3d.org/lmath.v1"
+	"azul3d.org/engine/gfx"
+	"azul3d.org/engine/gfx/camera"
+	"azul3d.org/engine/gfx/gfxutil"
+	"azul3d.org/engine/gfx/window"
+	"azul3d.org/engine/keyboard"
+	"azul3d.org/engine/lmath"
+	"azul3d.org/examples/abs"
 )
 
-func loadShaderSources(s *gfx.Shader, vert, frag string) {
-	vertFile, err := os.Open(vert)
-	if err != nil {
-		panic(err)
-	}
-
-	s.GLSLVert, err = ioutil.ReadAll(vertFile)
-	if err != nil {
-		panic(err)
-	}
-
-	fragFile, err := os.Open(frag)
-	if err != nil {
-		panic(err)
-	}
-
-	s.GLSLFrag, err = ioutil.ReadAll(fragFile)
-	if err != nil {
-		panic(err)
-	}
-}
-
-func mustLoadShader(name, vert, frag string) *gfx.Shader {
-	shader := gfx.NewShader(name)
-	loadShaderSources(shader, vert, frag)
-	return shader
-}
-
 // gfxLoop is responsible for drawing things to the window.
-func gfxLoop(w window.Window, r gfx.Renderer) {
-	// Setup a camera to use a perspective projection.
-	camera := gfx.NewCamera()
-	camNear := 0.01
-	camFar := 1000.0
-	camera.SetOrtho(r.Bounds(), camNear, camFar)
+func gfxLoop(w window.Window, d gfx.Device) {
+	// Create a new orthographic (2D) camera.
+	cam := camera.NewOrtho(d.Bounds())
 
 	// Move the camera back two units away from the card.
-	camera.SetPos(lmath.Vec3{0, -2, 0})
+	cam.SetPos(lmath.Vec3{0, -2, 0})
 
-	// Create a simple shader.
-	shader := mustLoadShader(
-		"SimpleShader",
-		"src/azul3d.org/examples.v1/azul3d_vgfx/shader.vert",
-		"src/azul3d.org/examples.v1/azul3d_vgfx/shader.frag",
-	)
-
-	// Load the picture.
-	f, err := os.Open("src/azul3d.org/examples.v1/assets/textures/texture_coords_1024x1024.png")
+	// Read the GLSL shaders from disk.
+	shader, err := gfxutil.OpenShader(abs.Path("azul3d_vgfx/shader"))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	img, _, err := image.Decode(f)
+	// Open the texture.
+	tex, err := gfxutil.OpenTexture(abs.Path("azul3d_texcoords/texture_coords_1024x1024.png"))
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	// Create new texture.
-	tex := &gfx.Texture{
-		Source:    img,
-		MinFilter: gfx.Linear,
-		MagFilter: gfx.Linear,
-		Format:    gfx.DXT1RGBA,
-	}
+	tex.Format = gfx.DXT1RGBA
 
 	// Create a card mesh.
 	cardMesh := gfx.NewMesh()
@@ -101,51 +58,48 @@ func gfxLoop(w window.Window, r gfx.Renderer) {
 
 	// Create a card object.
 	card := gfx.NewObject()
+	card.State = gfx.NewState()
 	card.AlphaMode = gfx.AlphaToCoverage
 	card.Shader = shader
 	card.Textures = []*gfx.Texture{tex}
 	card.Meshes = []*gfx.Mesh{cardMesh}
 
-	go func() {
-		for e := range w.Events() {
+	// Create a channel of events.
+	events := make(chan window.Event, 256)
+
+	// Have the window notify our channel whenever events occur.
+	w.Notify(events, window.FramebufferResizedEvents|window.KeyboardTypedEvents)
+
+	for {
+		// Handle each pending event.
+		window.Poll(events, func(e window.Event) {
 			switch ev := e.(type) {
-			case chippy.ResizedEvent:
+			case window.FramebufferResized:
 				// Update the camera's projection matrix for the new width and
 				// height.
-				camera.Lock()
-				camera.SetOrtho(r.Bounds(), camNear, camFar)
-				camera.Unlock()
-			case keyboard.TypedEvent:
-				if ev.Rune == 'r' {
-					card.Lock()
-					card.Shader.Lock()
-					card.Shader.Reset()
-					loadShaderSources(
-						card.Shader,
-						"src/azul3d.org/examples.v1/azul3d_vgfx/shader.vert",
-						"src/azul3d.org/examples.v1/azul3d_vgfx/shader.frag",
-					)
-					card.Shader.Unlock()
-					card.Unlock()
+				cam.Update(d.Bounds())
 
-				} else if ev.Rune == 'b' {
-					card.Shader.Lock()
-
+			case keyboard.Typed:
+				if ev.S == "r" {
+					// Read the GLSL shaders from disk.
+					shader, err := gfxutil.OpenShader(abs.Path("azul3d_vgfx/shader"))
+					if err != nil {
+						log.Fatal(err)
+					}
+					card.Shader = shader
+				} else if ev.S == "b" {
 					var enabled bool
 					v, ok := card.Shader.Inputs["Enabled"]
 					if ok {
 						enabled = v.(bool)
 					}
 					card.Shader.Inputs["Enabled"] = !enabled
-					card.Shader.Unlock()
 				}
 			}
-		}
-	}()
+		})
 
-	for {
 		// Center the card in the window.
-		b := r.Bounds()
+		b := d.Bounds()
 		card.SetPos(lmath.Vec3{float64(b.Dx()) / 2.0, 0, float64(b.Dy()) / 2.0})
 
 		// Scale the card to fit the window.
@@ -153,17 +107,17 @@ func gfxLoop(w window.Window, r gfx.Renderer) {
 		card.SetScale(lmath.Vec3{s, s, s})
 
 		// Clear the entire area (empty rectangle means "the whole area").
-		r.Clear(image.Rect(0, 0, 0, 0), gfx.Color{.7, .7, .7, .7})
-		r.ClearDepth(image.Rect(0, 0, 0, 0), 1.0)
+		d.Clear(d.Bounds(), gfx.Color{.7, .7, .7, .7})
+		d.ClearDepth(d.Bounds(), 1.0)
 
 		h := b.Dy() / 2.0
-		r.Clear(image.Rect(b.Min.X, h-5, b.Max.X, h), gfx.Color{0, 0, 1, 1})
+		d.Clear(image.Rect(b.Min.X, h-5, b.Max.X, h), gfx.Color{0, 0, 1, 1})
 
 		// Draw the textured card.
-		r.Draw(image.Rect(0, 0, 0, 0), card, camera)
+		d.Draw(d.Bounds(), card, cam)
 
 		// Render the whole frame.
-		r.Render()
+		d.Render()
 	}
 }
 
